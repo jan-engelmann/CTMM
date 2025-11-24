@@ -227,7 +227,7 @@ def pseudobulk(counts: pd.DataFrame = None, meta: pd.DataFrame = None, ann: obje
 
 
 def _softimpute(data: pd.DataFrame, seed: int = None, scale: bool = True) -> pd.DataFrame:
-    '''
+    """
     Impute missing ctp or ct-specific noise variance (ctnu)
 
     Parameters:
@@ -236,28 +236,38 @@ def _softimpute(data: pd.DataFrame, seed: int = None, scale: bool = True) -> pd.
         scale:  scale before imputation
     Results:
         imputed dataset
-    '''
+    """
     # load softImpute r package
     is_sourced = r("exists('my_softImpute')")[0]
     if not is_sourced:
-        rf = pkg_resources.resource_filename(__name__, 'softImpute.R')
-        softImpute = STAP(open(rf).read(), 'softImpute')
+        rf = pkg_resources.resource_filename(__name__, "softImpute.R")
+        softImpute = STAP(open(rf).read(), "softImpute")
 
     if seed is None:
         seed = ro.NULL
 
     # Impute
-    pandas2ri.activate()
-    if scale:
-        out = softImpute.my_softImpute(r['as.matrix'](data), scale=ro.vectors.BoolVector([True]), seed=seed)
-    else:
-        out = softImpute.my_softImpute(r['as.matrix'](data), seed=seed)
+    # pandas2ri.activate()
+    # if scale:
+    #     out = softImpute.my_softImpute(r['as.matrix'](data), scale=ro.vectors.BoolVector([True]), seed=seed)
+    # else:
+
+    from rpy2.robjects.conversion import localconverter
+
+    # pandas2ri.activate()  <-- DELETE or COMMENT OUT this line
+
+    # Wrap the R call in this context manager
+    with localconverter(ro.default_converter + pandas2ri.converter + numpy2ri.converter):
+        if scale:
+            out = softImpute.my_softImpute(r["as.matrix"](data), scale=ro.vectors.BoolVector([True]), seed=seed)
+        else:
+            out = softImpute.my_softImpute(r["as.matrix"](data), seed=seed)
     out = dict(zip(out.names, list(out)))
-    out = pd.DataFrame(out['Y'], index=data.index, columns=data.columns)
-    pandas2ri.deactivate()
+    out = pd.DataFrame(out["Y"], index=data.index, columns=data.columns)
 
-    return (out)
+    # pandas2ri.deactivate()
 
+    return out
 
 def softimpute(data: pd.DataFrame, seed: int = None, scale: bool = True,
                per_gene: bool = False) -> pd.DataFrame:
